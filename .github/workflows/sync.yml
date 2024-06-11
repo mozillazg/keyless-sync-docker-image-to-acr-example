@@ -1,0 +1,52 @@
+name: sync
+
+on:
+  push:
+    branches: [ "master" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+  schedule:
+    - cron: "02 */24 */1 * *"
+
+jobs:
+  sync-docker-image-to-arc:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # This is required for requesting the JWT
+      contents: read  # This is required for actions/checkout
+
+    steps:
+      - name: install crane
+        run: |
+          # https://github.com/google/go-containerregistry/releases
+          wget https://github.com/google/go-containerregistry/releases/download/v0.19.1/go-containerregistry_Linux_x86_64.tar.gz
+          tar zxvf go-containerregistry_Linux_x86_64.tar.gz
+          sudo cp crane /usr/local/bin/
+
+      - name: get aliyun credentials
+        id: aliyun
+        uses: 'mozillazg/alibabacloud-oidc-auth@v1'
+        with:
+          role-arn-to-assume: '${{ secrets.ALIBABA_CLOUD_RAM_ROLE_ARN }}'
+          oidc-provider-arn: '${{ secrets.ALIBABA_CLOUD_RAM_OIDC_ARN }}'
+          set-outputs: 'true'
+
+      - name: login acr
+        uses: aliyun/acr-login@v1
+        with:
+          region-id: 'cn-hangzhou'
+          # login-server: 'https://registry.cn-hangzhou.aliyuncs.com'
+          access-key-id: '${{ steps.aliyun.outputs.access-key-id }}'
+          access-key-secret: '${{ steps.aliyun.outputs.access-key-secret }}'
+          security-token: '${{ steps.aliyun.outputs.security-token }}'
+
+      - name: sync examples
+        run: |
+          # https://github.com/google/go-containerregistry/blob/main/cmd/crane/doc/crane_copy.md
+          #　sync one tag
+          crane copy busybox:1.36.1-musl registry.cn-hangzhou.aliyuncs.com/${{ secrets.ACR_NAMESPACE }}/busybox:1.36.1-musl
+          
+          # sync all tags
+          crane copy --all-tags --platform=all hello-world registry.cn-hangzhou.aliyuncs.com/${{ secrets.ACR_NAMESPACE }}/hello-world
+
