@@ -30,6 +30,7 @@ jobs:
         with:
           role-arn-to-assume: '${{ secrets.ALIBABA_CLOUD_RAM_ROLE_ARN }}'
           oidc-provider-arn: '${{ secrets.ALIBABA_CLOUD_RAM_OIDC_ARN }}'
+          role-duration-seconds: '900'  # 15 minutes
           set-outputs: 'true'
 
       - name: login acr
